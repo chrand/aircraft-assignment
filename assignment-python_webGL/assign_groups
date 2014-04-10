@@ -1,0 +1,311 @@
+#!/usr/bin/python
+
+import argparse
+import re
+import os,sys,time
+import numpy as N
+
+SEATS_AS_MULTISHAPES=True
+SEATS_AS_CRATES=not(SEATS_AS_MULTISHAPES)
+SEATS_AS_SPHERES=not(SEATS_AS_MULTISHAPES) and not(SEATS_AS_CRATES)
+
+_DEBUG_LEVEL=0
+#======================================================================
+def timestamp(t=time.localtime()):
+    return time.strftime("%Y.%m.%d-%H:%M:%S",t)
+
+def log(msg):
+  print "%s: %s" % (timestamp(), msg)
+  sys.stdout.flush()
+  sys.stderr.flush()
+
+# flatten function
+flatten = lambda arr: reduce(lambda x, y: ((isinstance(y, (list, tuple)) or x.append(y)) and x.extend(flatten(y))) or x, arr, [])
+#======================================================================
+def cmdline_parser():
+  parser = argparse.ArgumentParser()
+  parser.add_argument("-W", "--WEB-OUTPUT", help="generates a webGL schema, starts a web server at port 8000", action="store_true")
+  parser.add_argument("-R", "--seats_per_row_groups", help="groups of seats for each row", default="2,2")
+  parser.add_argument("-r", "--rows-num", help="number of rows", type=int, default=23)
+  parser.add_argument('groups', type=int, nargs='*', help='groups of passengers',default=[3,3,5,2,2,1,4,3,2,1,2,2,1,3,1,1,5,2,2,2,2,1])
+  args = parser.parse_args()
+  args.seats_per_row_groups=map(lambda x: int(x),args.seats_per_row_groups.split(","))
+  args.groups.sort(reverse=True)
+  #print args
+  return args
+#======================================================================
+class Aircraft:
+  def __init__(self, rows_total=13, seats_per_row_groups=(3,3),webGL_seat_size=50):
+    self.rows_total=rows_total
+    self.seats_per_row_groups=seats_per_row_groups
+    self.seats_per_row_total=sum(seats_per_row_groups)
+    self.seats_total=self.rows_total*self.seats_per_row_total
+    self.webGL_seat_size=webGL_seat_size
+    #
+    self.seats_per_row_groups_scan=list(seats_per_row_groups)
+    for j in xrange(1,len(seats_per_row_groups)):
+      self.seats_per_row_groups_scan[j]+=self.seats_per_row_groups_scan[j-1]
+    # group assignments: empty
+    self.group_layout_3d_color={}
+    self.group_layout_3d_shape={}
+    self.group_layout_3d_shape_default=[
+      "THREE.CubeGeometry(%d,%d,%d,1,1,1)" % (webGL_seat_size,webGL_seat_size,webGL_seat_size),
+      "THREE.IcosahedronGeometry(%d,0)" % (0.6*webGL_seat_size,),
+      "THREE.OctahedronGeometry(%d,0)" % (0.6*webGL_seat_size,),
+      "THREE.TetrahedronGeometry(%d,0)" % (0.8*webGL_seat_size,),
+      "THREE.SphereGeometry(%d,%d,%d)" % (0.6*webGL_seat_size,0.5*webGL_seat_size,0.25*webGL_seat_size),
+      "THREE.CubeGeometry(%d,%d,%d,2,2,2)" % (webGL_seat_size,webGL_seat_size,webGL_seat_size,),
+      "THREE.IcosahedronGeometry(%d,1)" % (0.6*webGL_seat_size,),
+      "THREE.OctahedronGeometry(%d,1)" % (0.6*webGL_seat_size,),
+      "THREE.TetrahedronGeometry(%d,1)" % (0.8*webGL_seat_size,),
+      "THREE.SphereGeometry(%d,%d,%d,0,2*Math.PI,0,Math.PI/2)" % (0.6*webGL_seat_size,0.5*webGL_seat_size,0.25*webGL_seat_size,),
+      "THREE.CylinderGeometry(%d,%d,%d,20,4)" % (0.6*webGL_seat_size,0.6*webGL_seat_size,1.6*webGL_seat_size,),
+      "THREE.CylinderGeometry(0,%d,%d,20,4)" % (0.6*webGL_seat_size,2*webGL_seat_size,),
+      "THREE.CylinderGeometry(0,%d,%d,4,4)" % (0.6*webGL_seat_size,2*webGL_seat_size,),
+      "THREE.TorusGeometry(25,10,8,4)",
+      "THREE.TorusKnotGeometry(30,8,60,10,2,3)",
+      "THREE.CylinderGeometry(30,30,80,6,4)",
+      "THREE.CylinderGeometry(10,30,100,20,4)",
+      "THREE.CylinderGeometry(15,30,100,6,4)",
+      "THREE.TorusGeometry(30,20,16,40)",
+      "THREE.TorusKnotGeometry(30,6,160,10,3,7)"
+      ]
+    self.group_layout_3d_color_face_default=["0xffffcc","0xffccff","0xccffff","0xffeebb","0xffbbee","0xbbffee","0xbbeeff"]*(self.seats_total/len(self.group_layout_3d_shape_default)+1)
+    # initialize internal structures
+    self._construct_empty()
+    self._preferred_order()
+
+  def info(self):
+    print "# aircraft with %d total places (%d rows of %s seats). %d total passengers in %d groups" % (
+      self.seats_total, self.rows_total, self.seats_per_row_groups, sum(args.groups),len(args.groups) )
+
+  def _construct_empty(self):
+    self.seats_map=[]
+    for rj in xrange(self.rows_total):
+      self.seats_map.append([])
+      for sj in xrange(self.seats_per_row_total):
+        self.seats_map[rj].append(False)
+
+  def _preferred_order(self):
+    # rows preferred order
+    rows_preferred_order=range(1,int(self.rows_total*.4))
+    rows_preferred_order.append(0)
+    rows_preferred_order.extend(range(int(self.rows_total*.6),self.rows_total-1))
+    rows_preferred_order.extend(range(int(self.rows_total*.4),int(self.rows_total*.6)))
+    rows_preferred_order.append(self.rows_total-1)
+    self.rows_preferred_order=rows_preferred_order
+    # seats, preferred orders in a row: extremes of seat groups, then all other intermediate seats
+    seats_per_row_preferred_order_A=[0]
+    if self.seats_per_row_groups_scan[:-1]!=0: seats_per_row_preferred_order_A.extend(self.seats_per_row_groups_scan[:-1])
+    seats_per_row_preferred_order_B=[seat for seat in map(lambda x: x-1, self.seats_per_row_groups_scan) if not(seat in seats_per_row_preferred_order_A)]
+    seats_per_row_preferred_order_B.reverse()
+    seats_per_row_preferred_order=flatten(zip(seats_per_row_preferred_order_A, seats_per_row_preferred_order_B))
+    seats_per_row_preferred_order.extend([seat for seat in xrange(self.seats_per_row_total) if seat not in set(seats_per_row_preferred_order)])
+    self.seats_per_row_preferred_order=seats_per_row_preferred_order
+    # all seats in all rows
+    self.seats_preferred_order=zip(rows_preferred_order*self.seats_per_row_total, seats_per_row_preferred_order*self.rows_total)
+    #
+    if _DEBUG_LEVEL>=50:
+      print "# preferred order: rows: %s" % self.rows_preferred_order
+      print "# preferred order: seats in rows: %s" % self.seats_per_row_preferred_order
+      print "# preferred order: seats: %s" % self.seats_preferred_order
+    if _DEBUG_LEVEL>=100:
+      print "# occupation TEST: pre:",self.seats_preferred_order
+      for (rj,sj) in self.seats_preferred_order[:len(self.seats_preferred_order)/3]:
+        self.seat_occupy(rj,sj)
+      print "# occupation TEST: post:",self.seats_preferred_order
+
+  def group_assign(self,group_remaining_members,label=0):
+    _assigned=False
+    # do we want to sit close?
+    while group_remaining_members>0:
+      # not assigned by neighbour? jump
+      if _assigned==False:
+        rj,sj=self.seat_preferred_next()
+        if rj is not None and sj is not None:
+          self.seat_occupy(rj,sj,label=label)
+          group_remaining_members-=1
+          _assigned=True
+        else:
+          break
+      if group_remaining_members==0: break
+      # next by shifting one position
+      for (rj1,sj1) in [(rj,sj-1),(rj,sj+1),(rj,sj+2),(None,None)]:
+        if rj1 is None:
+          _assigned=False
+          break
+        if self.seat_is_free(rj1,sj1):
+          self.seat_occupy(rj1,sj1,label=label)
+          group_remaining_members-=1
+          _assigned=True
+          rj,sj=rj1,sj1
+          break
+    # 3d layout
+    if _assigned==True:
+      self.group_layout_3d_color[label]=(self.group_layout_3d_color_face_default[label/len(self.group_layout_3d_shape_default)],"0x000000")
+      self.group_layout_3d_shape[label]=self.group_layout_3d_shape_default[ label % len(self.group_layout_3d_shape_default) ]
+
+  def show(self):
+    for rj in xrange(self.rows_total):
+      print ("row %3d: " % rj),
+      for sj in xrange(self.seats_per_row_total):
+        label=self.seats_map[rj][sj]
+        if type(label)==bool and label==True:    sys.stdout.write("X")
+        elif type(label)==bool and label==False: sys.stdout.write("-")
+        else:                                    sys.stdout.write(chr(48+label))
+        # separator
+        if sj+1 in self.seats_per_row_groups_scan:
+          sys.stdout.write(" ")
+      print
+
+  def seat_preferred_next(self):
+    if _DEBUG_LEVEL>10: print "# preferred order, %d remaining: %s" % (len(self.seats_preferred_order),self.seats_preferred_order)
+    if len(self.seats_preferred_order): return self.seats_preferred_order[0]
+    else: return None,None
+
+  def seat_is_free(self,rj,sj):
+    if rj<0 or rj>=self.rows_total or sj<0 or sj>=self.seats_per_row_total: return False
+    else: return ( type(self.seats_map[rj][sj])==bool and self.seats_map[rj][sj]==False)
+
+  def seat_occupy(self,rj,sj,label=True):
+    if _DEBUG_LEVEL>=10: print "occupy: %d,%d -> free? %s (label: %s)" % (rj,sj,self.seat_is_free(rj,sj),self.seats_map[rj][sj])
+    if self.seat_is_free(rj,sj)==True:
+      self.seats_map[rj][sj]=label
+      if _DEBUG_LEVEL>=10: print "occupying seat: %s with label: %s" % ((rj,sj),label)
+      self.seats_preferred_order.remove((rj,sj))
+      return 0
+    else:
+      return 1
+
+  def apply_to_html_template(self,template_filename="./html/template.html", output_filename="./html/index.html"):
+    iH=open(name=template_filename,mode="r")
+    template_content=iH.read()
+    iH.close()
+    # template extraction
+    template_pre=re.search("(.*?<!-- TEMPLATE_INSERT_AIRCRAFT_SEATS_BEGIN -->)",template_content,flags=re.M+re.S).group()
+    template_post=re.search("(<!-- TEMPLATE_INSERT_AIRCRAFT_SEATS_END -->.*)",template_content,flags=re.M+re.S).group()
+    # write output ------------------------------------
+    oH=open(output_filename,"w")
+    oH.write(template_pre+"\n")
+    # fill aircfraft seats
+    seats_horizontal_size=self.seats_per_row_total*self.webGL_seat_size+self.webGL_seat_size*1.2*(len(self.seats_per_row_groups)-1)
+    seats_vertical_size=self.rows_total*self.webGL_seat_size
+    coord_x_base=-seats_horizontal_size/2
+    coord_y_base=-seats_vertical_size/2
+    for rj in xrange(self.rows_total):
+      coord_y = coord_y_base+rj*self.webGL_seat_size
+      coord_x=coord_x_base
+      for sj in xrange(self.seats_per_row_total):
+        coord_x+=self.webGL_seat_size
+        if self.seat_is_free(rj,sj):
+          if SEATS_AS_CRATES or SEATS_AS_MULTISHAPES: oH.write("var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );\n")
+          if SEATS_AS_SPHERES: oH.write("var obj = new THREE.Mesh( sphereGeom.clone(), freeSeatMaterial );\n")
+        else:
+          label=self.seats_map[rj][sj]
+          if SEATS_AS_MULTISHAPES: 
+            oH.write("// Using wireframe materials to illustrate shape details.\n")
+            oH.write("var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: %s } );\n" % self.group_layout_3d_color[label][0])
+            oH.write("var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: %s, wireframe: true, transparent: true } );\n" % self.group_layout_3d_color[label][1])
+            oH.write("var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];\n")
+            oH.write("var obj = THREE.SceneUtils.createMultiMaterialObject( new %s, shapes_occupiedSeatMaterial );\n" % self.group_layout_3d_shape[label])
+          elif SEATS_AS_CRATES: oH.write("var obj = THREE.SceneUtils.createMultiMaterialObject( cubeGeometryFull.clone(), multiMaterial );\n")
+          elif SEATS_AS_SPHERES: oH.write("var obj = new THREE.Mesh( sphereGeom.clone(), occupiedSeatMaterial );\n")
+        #
+        oH.write("obj.position.set(%d, 0, %d);\n" % (coord_x, coord_y) )
+        oH.write("scene.add( obj );\n\n")
+        # separator
+        if sj+1 in self.seats_per_row_groups_scan:
+          coord_x+=self.webGL_seat_size*1.2
+    # floor geometry
+    oH.write("// floor geometry\n")
+    oH.write("var floorGeometry = new THREE.PlaneGeometry(%d, %d, 10, 10);\n" % (seats_horizontal_size+self.webGL_seat_size,seats_vertical_size+self.webGL_seat_size) )
+    # aircraft profile
+    floor_position_offset_y=-50
+    floor_position_offset_x=50/2
+    floor_position_offset_z=-50/2
+    oH.write("// aircraft profile\n")
+    oH.write("var aircraft_profile_coords = new THREE.Geometry();\n")
+    # floor top left
+    floor_top_left_coords=-(seats_horizontal_size+self.webGL_seat_size)/2, floor_position_offset_y, -(seats_vertical_size/2+self.webGL_seat_size)
+    floor_top_right_coords=(seats_horizontal_size+self.webGL_seat_size)/2, floor_position_offset_y, floor_top_left_coords[2]
+    floor_bottom_right_coords=floor_top_right_coords[0], floor_position_offset_y, -floor_top_right_coords[2]-self.webGL_seat_size
+    floor_bottom_left_coords=floor_top_left_coords[0], floor_position_offset_y, floor_bottom_right_coords[2]
+    floor_x_center=floor_position_offset_x
+    #
+    def points_sequence_3d(
+        offset=(0,floor_position_offset_y,-1.2*(seats_vertical_size/2+self.webGL_seat_size)),
+        scale=self.webGL_seat_size,
+        symmetric_x=False, symmetric_y=False,symmetric_z=False,
+        reverse=False,
+        wing_rear_scale=0.2,
+        ):
+      """2d trace, logo style: next point is increment from previous. needs a scan() to pass to absolute coords"""
+      s0=[
+        # head
+        (0.24,0,0), (0.5,0,0),
+        # side
+        (2.86,0,2.5),
+        # wing
+        (0,0,7.7),(15,0,4.8),(0,0,1.2),(-15,0,-1.68),
+        # side
+        (0,0,11.98),
+        # tail, rear wing
+        (-1,0,1),
+        N.array((15,0,4.8))*wing_rear_scale,N.array((0,0,1.2))*wing_rear_scale,N.array((-18,0,-1.68))*wing_rear_scale,
+        (-1.2,0,1.2),(-0.5,0,0)
+        ]
+      # scan()
+      s=[]
+      for pj in xrange(len(s0)):
+        p1=[0]*len(s0[pj])
+        for cj in xrange(len(s0[pj])):
+          p1[cj]=s0[pj][cj]
+          if pj>0: p1[cj]+=s[pj-1][cj]
+          ##p1[cj]=p1[cj]*scale+offset[cj]
+        s.append(p1)
+      # absolute coordinates
+      for pj in xrange(len(s0)):
+        for cj in xrange(len(s0[pj])):
+          s[pj][cj]=s[pj][cj]*scale+offset[cj]
+      if symmetric_x==True: s=map(lambda p: (-p[0],p[1],p[2]),s)
+      if symmetric_y==True: s=map(lambda p: (p[0],-p[1],p[2]),s)
+      if symmetric_z==True: s=map(lambda p: (p[0],p[1],-p[2]),s)
+      if reverse==True: s.reverse()
+      return s
+    # aircraft 2d layout
+    points_sequence_3d_offset=(0,floor_position_offset_y,-1.2*(seats_vertical_size/2+self.webGL_seat_size))
+    aircraft_profile_coords=points_sequence_3d( offset=points_sequence_3d_offset )
+    aircraft_profile_coords.extend(points_sequence_3d(reverse=True,symmetric_x=True, offset=(-self.webGL_seat_size,points_sequence_3d_offset[1],points_sequence_3d_offset[2]) ))
+    # write to template
+    for point in aircraft_profile_coords:
+      point=tuple(point)
+      oH.write("aircraft_profile_coords.vertices.push( new THREE.Vector3( %.1f, %.1f, %.1f ) );\n" % point)
+    #
+    oH.write("\n// material\n")
+    oH.write("var aircraft_material=new THREE.LineBasicMaterial({ color: 0xdddddd, linewidth: 1 });\n")
+    oH.write("// line\n")
+    oH.write("var aircraft_profile_line = new THREE.Line( aircraft_profile_coords, aircraft_material );\n")
+    oH.write("scene.add( aircraft_profile_line );\n")
+    # write post
+    oH.write(template_post)
+    oH.close()
+#======================================================================
+# MAIN
+#======================================================================
+if __name__=='__main__':
+  args=cmdline_parser()
+  #
+  aircraft=Aircraft(args.rows_num,args.seats_per_row_groups)
+  aircraft.info()
+  # assign grups
+  if len(args.groups): print "# groups:",args.groups
+  for gj,group_members_total in enumerate(args.groups):
+    if _DEBUG_LEVEL>0: print "# group label:", gj
+    aircraft.group_assign(group_members_total,label=gj)
+  aircraft.show()
+  # webGL schema, spawn web server
+  if args.WEB_OUTPUT:
+    log("TODO: scale horizontal floorplan with seat groups")
+    aircraft.apply_to_html_template()
+    os.system("netstat -tupan 2>/dev/null| grep -q 8000 || cd html && nohup python -m SimpleHTTPServer >/dev/null 2>&1 &")
+    log("web server listening at http://localhost:8000")

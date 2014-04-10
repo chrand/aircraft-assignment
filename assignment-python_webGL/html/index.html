@@ -1,0 +1,1671 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <title>Aircraft sits assigment - demo by C.Andreetta 2014</title>
+    <!--based on stemkoski-->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <link rel=stylesheet href="css/base.css"/>
+</head>
+<body>
+
+<script src="js/Three.js"></script>
+<script src="js/Detector.js"></script>
+<script src="js/Stats.js"></script>
+<script src="js/OrbitControls.js"></script>
+<script src="js/THREEx.KeyboardState.js"></script>
+<script src="js/THREEx.FullScreen.js"></script>
+<script src="js/THREEx.WindowResize.js"></script>
+<script src="js/SubdivisionModifier.js"></script>
+<script src="js/shaders/FresnelShader.js"></script>
+<script src="js/MarchingCubesData.js"></script>
+
+<!-- Code to display an information button and box when clicked. -->
+<script src="js/jquery-1.9.1.js"></script>
+<script src="js/jquery-ui.js"></script>
+<link rel=stylesheet href="css/jquery-ui.css" />
+<link rel=stylesheet href="css/info.css"/>
+<script src="js/info.js"></script>
+<div id="infoButton"></div>
+<div id="infoBox" title="Aircraft sits assigment - demo by C.Andreetta 2014">
+Aircraft sits assigment - demo by C.Andreetta 2014
+</div>
+<!-- ------------------------------------------------------------ -->
+
+<div id="ThreeJS" style="position: absolute; left:0px; top:0px"></div>
+<script>
+
+// bug fix: https://github.com/mrdoob/three.js/issues/687
+THREE.ImageUtils.crossOrigin = "";
+
+// MAIN
+
+// standard global variables
+var container, scene, camera, renderer, controls, stats;
+var keyboard = new THREEx.KeyboardState();
+var clock = new THREE.Clock();
+
+// custom global variables
+var mesh;
+var SCENE_CUBE_SIZE=25000;
+
+init();
+animate();
+
+// FUNCTIONS     
+function init() 
+{
+  // SCENE
+  scene = new THREE.Scene();
+  // CAMERA
+  var SCREEN_WIDTH = window.innerWidth, SCREEN_HEIGHT = window.innerHeight;
+  var VIEW_ANGLE = 40, ASPECT = SCREEN_WIDTH / SCREEN_HEIGHT, NEAR = 0.1, FAR = 40000;
+  camera = new THREE.PerspectiveCamera( VIEW_ANGLE, ASPECT, NEAR, FAR);
+  scene.add(camera);
+  camera.position.set(-150,300,500);
+  camera.lookAt(scene.position);  
+  // RENDERER
+  if ( Detector.webgl ) { renderer = new THREE.WebGLRenderer( {antialias:true} ); }
+  else { renderer = new THREE.CanvasRenderer(); }
+  renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+  container = document.getElementById( 'ThreeJS' );
+  container.appendChild( renderer.domElement );
+  // EVENTS
+  THREEx.WindowResize(renderer, camera);
+  THREEx.FullScreen.bindKey({ charCode : 'm'.charCodeAt(0) });
+  // CONTROLS
+  controls = new THREE.OrbitControls( camera, renderer.domElement );
+  // STATS
+  stats = new Stats();
+  stats.domElement.style.position = 'absolute';
+  stats.domElement.style.bottom = '0px';
+  stats.domElement.style.zIndex = 100;
+  container.appendChild( stats.domElement );
+  // LIGHT
+  var light = new THREE.PointLight(0xffffff);
+  light.position.set(0,800,0);
+  scene.add(light);
+
+  // SKYBOX
+  var imagePrefix = "images/dawnmountain-";
+  var directions  = ["xpos", "xneg", "ypos", "yneg", "zpos", "zneg"];
+  var imageSuffix = ".png";
+  var skyGeometry = new THREE.CubeGeometry( SCENE_CUBE_SIZE, SCENE_CUBE_SIZE, SCENE_CUBE_SIZE );  
+
+  var urls = [];
+  for (var i = 0; i < 6; i++)
+    urls.push( imagePrefix + directions[i] + imageSuffix );
+
+  var materialArray = [];
+  for (var i = 0; i < 6; i++) {
+    materialArray.push( new THREE.MeshBasicMaterial({
+      map: THREE.ImageUtils.loadTexture( imagePrefix + directions[i] + imageSuffix ),
+      side: THREE.BackSide
+    }));
+  }
+  var skyMaterial = new THREE.MeshFaceMaterial( materialArray );
+  var skyBox = new THREE.Mesh( skyGeometry, skyMaterial );
+  scene.add( skyBox );
+
+  ///////////////////////
+  // Christian A. 2014 //
+  ///////////////////////
+  /* CRATES -------------------------------------------------------- */
+  var crateTexture = new THREE.ImageUtils.loadTexture( 'images/crate.gif' );
+  var crateMaterial = new THREE.MeshBasicMaterial( { map: crateTexture } );
+  var wireframeMaterial = new THREE.MeshBasicMaterial( { color:0x888888, wireframe: true, transparent: true } ); 
+  //var multiMaterial = [ crateMaterial, wireframeMaterial ]; 
+  var multiMaterial = [ wireframeMaterial ]; 
+  var cubeGeometryFull = new THREE.CubeGeometry( 40, 40, 40 , 0, 0, 0 );
+  var cubeGeometrySmooth = new THREE.CubeGeometry( 40, 40, 40 , 1, 1, 1 );
+  var smooth = cubeGeometrySmooth.clone();
+  var modifier = new THREE.SubdivisionModifier( 1 );
+  modifier.modify( smooth ); 
+  /* SPHERES ------------------------------------------------------- */
+  // radius, segments along width, segments along height
+  var sphereGeom =  new THREE.SphereGeometry( 20, 24, 12 );
+  var freeSeatMaterial =  new THREE.MeshBasicMaterial( { color: 0x996600, transparent: true, opacity: 0.90 } );
+  var occupiedSeatMaterial = new THREE.MeshBasicMaterial( { color: 0x0000ff, transparent: true, opacity: 0.90 } );
+
+  <!-- TEMPLATE_INSERT_AIRCRAFT_SEATS_BEGIN -->
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-210, 0, -775);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-160, 0, -775);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-50, 0, -775);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(0, 0, -775);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.CylinderGeometry(30,30,80,20,4), shapes_occupiedSeatMaterial );
+obj.position.set(50, 0, -775);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.CylinderGeometry(30,30,80,20,4), shapes_occupiedSeatMaterial );
+obj.position.set(100, 0, -775);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, -775);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, -775);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.CubeGeometry(50,50,50,1,1,1), shapes_occupiedSeatMaterial );
+obj.position.set(-210, 0, -725);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.CubeGeometry(50,50,50,1,1,1), shapes_occupiedSeatMaterial );
+obj.position.set(-160, 0, -725);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.CubeGeometry(50,50,50,1,1,1), shapes_occupiedSeatMaterial );
+obj.position.set(-50, 0, -725);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.CubeGeometry(50,50,50,1,1,1), shapes_occupiedSeatMaterial );
+obj.position.set(0, 0, -725);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.CubeGeometry(50,50,50,1,1,1), shapes_occupiedSeatMaterial );
+obj.position.set(50, 0, -725);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(100, 0, -725);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, -725);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, -725);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-210, 0, -675);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-160, 0, -675);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-50, 0, -675);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.IcosahedronGeometry(30,0), shapes_occupiedSeatMaterial );
+obj.position.set(0, 0, -675);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.IcosahedronGeometry(30,0), shapes_occupiedSeatMaterial );
+obj.position.set(50, 0, -675);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.IcosahedronGeometry(30,0), shapes_occupiedSeatMaterial );
+obj.position.set(100, 0, -675);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.IcosahedronGeometry(30,0), shapes_occupiedSeatMaterial );
+obj.position.set(210, 0, -675);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.IcosahedronGeometry(30,0), shapes_occupiedSeatMaterial );
+obj.position.set(260, 0, -675);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.OctahedronGeometry(30,0), shapes_occupiedSeatMaterial );
+obj.position.set(-210, 0, -625);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.OctahedronGeometry(30,0), shapes_occupiedSeatMaterial );
+obj.position.set(-160, 0, -625);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.OctahedronGeometry(30,0), shapes_occupiedSeatMaterial );
+obj.position.set(-50, 0, -625);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(0, 0, -625);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(50, 0, -625);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(100, 0, -625);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, -625);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, -625);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-210, 0, -575);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-160, 0, -575);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-50, 0, -575);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(0, 0, -575);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(50, 0, -575);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.OctahedronGeometry(30,0), shapes_occupiedSeatMaterial );
+obj.position.set(100, 0, -575);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, -575);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, -575);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-210, 0, -525);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-160, 0, -525);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-50, 0, -525);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(0, 0, -525);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.TetrahedronGeometry(40,0), shapes_occupiedSeatMaterial );
+obj.position.set(50, 0, -525);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.TetrahedronGeometry(40,0), shapes_occupiedSeatMaterial );
+obj.position.set(100, 0, -525);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.TetrahedronGeometry(40,0), shapes_occupiedSeatMaterial );
+obj.position.set(210, 0, -525);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, -525);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.SphereGeometry(30,25,12), shapes_occupiedSeatMaterial );
+obj.position.set(-210, 0, -475);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.SphereGeometry(30,25,12), shapes_occupiedSeatMaterial );
+obj.position.set(-160, 0, -475);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.SphereGeometry(30,25,12), shapes_occupiedSeatMaterial );
+obj.position.set(-50, 0, -475);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(0, 0, -475);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(50, 0, -475);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(100, 0, -475);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, -475);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, -475);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-210, 0, -425);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.CubeGeometry(50,50,50,2,2,2), shapes_occupiedSeatMaterial );
+obj.position.set(-160, 0, -425);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.CubeGeometry(50,50,50,2,2,2), shapes_occupiedSeatMaterial );
+obj.position.set(-50, 0, -425);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.CubeGeometry(50,50,50,2,2,2), shapes_occupiedSeatMaterial );
+obj.position.set(0, 0, -425);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(50, 0, -425);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(100, 0, -425);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, -425);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, -425);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-210, 0, -375);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-160, 0, -375);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.IcosahedronGeometry(30,1), shapes_occupiedSeatMaterial );
+obj.position.set(-50, 0, -375);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.IcosahedronGeometry(30,1), shapes_occupiedSeatMaterial );
+obj.position.set(0, 0, -375);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.IcosahedronGeometry(30,1), shapes_occupiedSeatMaterial );
+obj.position.set(50, 0, -375);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(100, 0, -375);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, -375);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, -375);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.OctahedronGeometry(30,1), shapes_occupiedSeatMaterial );
+obj.position.set(-210, 0, -325);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.OctahedronGeometry(30,1), shapes_occupiedSeatMaterial );
+obj.position.set(-160, 0, -325);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-50, 0, -325);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(0, 0, -325);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(50, 0, -325);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(100, 0, -325);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, -325);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, -325);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-210, 0, -275);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-160, 0, -275);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-50, 0, -275);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(0, 0, -275);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(50, 0, -275);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(100, 0, -275);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.TetrahedronGeometry(40,1), shapes_occupiedSeatMaterial );
+obj.position.set(210, 0, -275);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.TetrahedronGeometry(40,1), shapes_occupiedSeatMaterial );
+obj.position.set(260, 0, -275);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-210, 0, -225);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.SphereGeometry(30,25,12,0,2*Math.PI,0,Math.PI/2), shapes_occupiedSeatMaterial );
+obj.position.set(-160, 0, -225);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.SphereGeometry(30,25,12,0,2*Math.PI,0,Math.PI/2), shapes_occupiedSeatMaterial );
+obj.position.set(-50, 0, -225);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(0, 0, -225);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(50, 0, -225);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(100, 0, -225);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, -225);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, -225);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-210, 0, -175);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-160, 0, -175);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-50, 0, -175);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(0, 0, -175);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(50, 0, -175);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(100, 0, -175);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, -175);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, -175);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-210, 0, -125);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-160, 0, -125);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-50, 0, -125);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(0, 0, -125);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(50, 0, -125);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(100, 0, -125);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, -125);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, -125);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-210, 0, -75);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-160, 0, -75);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-50, 0, -75);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(0, 0, -75);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(50, 0, -75);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(100, 0, -75);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, -75);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, -75);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-210, 0, -25);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-160, 0, -25);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-50, 0, -25);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(0, 0, -25);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(50, 0, -25);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(100, 0, -25);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, -25);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, -25);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-210, 0, 25);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-160, 0, 25);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-50, 0, 25);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(0, 0, 25);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(50, 0, 25);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(100, 0, 25);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, 25);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, 25);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-210, 0, 75);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-160, 0, 75);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-50, 0, 75);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(0, 0, 75);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(50, 0, 75);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(100, 0, 75);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, 75);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, 75);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-210, 0, 125);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-160, 0, 125);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-50, 0, 125);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(0, 0, 125);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(50, 0, 125);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.CylinderGeometry(0,30,100,20,4), shapes_occupiedSeatMaterial );
+obj.position.set(100, 0, 125);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.CylinderGeometry(0,30,100,20,4), shapes_occupiedSeatMaterial );
+obj.position.set(210, 0, 125);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, 125);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.CylinderGeometry(0,30,100,4,4), shapes_occupiedSeatMaterial );
+obj.position.set(-210, 0, 175);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.CylinderGeometry(0,30,100,4,4), shapes_occupiedSeatMaterial );
+obj.position.set(-160, 0, 175);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-50, 0, 175);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(0, 0, 175);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(50, 0, 175);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(100, 0, 175);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, 175);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, 175);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-210, 0, 225);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-160, 0, 225);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.TorusGeometry(25,10,8,4), shapes_occupiedSeatMaterial );
+obj.position.set(-50, 0, 225);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.TorusGeometry(25,10,8,4), shapes_occupiedSeatMaterial );
+obj.position.set(0, 0, 225);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(50, 0, 225);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(100, 0, 225);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, 225);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, 225);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-210, 0, 275);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-160, 0, 275);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-50, 0, 275);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.TorusKnotGeometry(30,8,60,10,2,3), shapes_occupiedSeatMaterial );
+obj.position.set(0, 0, 275);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.TorusKnotGeometry(30,8,60,10,2,3), shapes_occupiedSeatMaterial );
+obj.position.set(50, 0, 275);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(100, 0, 275);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, 275);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, 275);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.CylinderGeometry(30,30,80,6,4), shapes_occupiedSeatMaterial );
+obj.position.set(-210, 0, 325);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.CylinderGeometry(30,30,80,6,4), shapes_occupiedSeatMaterial );
+obj.position.set(-160, 0, 325);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-50, 0, 325);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(0, 0, 325);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(50, 0, 325);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(100, 0, 325);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, 325);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, 325);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-210, 0, 375);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-160, 0, 375);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-50, 0, 375);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(0, 0, 375);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(50, 0, 375);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(100, 0, 375);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, 375);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.CylinderGeometry(10,30,100,20,4), shapes_occupiedSeatMaterial );
+obj.position.set(260, 0, 375);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-210, 0, 425);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-160, 0, 425);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.CylinderGeometry(15,30,100,6,4), shapes_occupiedSeatMaterial );
+obj.position.set(-50, 0, 425);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(0, 0, 425);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(50, 0, 425);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(100, 0, 425);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, 425);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, 425);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-210, 0, 475);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-160, 0, 475);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-50, 0, 475);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(0, 0, 475);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(50, 0, 475);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.TorusGeometry(30,20,16,40), shapes_occupiedSeatMaterial );
+obj.position.set(100, 0, 475);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, 475);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, 475);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-210, 0, 525);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-160, 0, 525);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-50, 0, 525);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(0, 0, 525);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(50, 0, 525);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(100, 0, 525);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffffcc } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.TorusKnotGeometry(30,6,160,10,3,7), shapes_occupiedSeatMaterial );
+obj.position.set(210, 0, 525);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, 525);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-210, 0, 575);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffccff } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.CubeGeometry(50,50,50,1,1,1), shapes_occupiedSeatMaterial );
+obj.position.set(-160, 0, 575);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-50, 0, 575);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(0, 0, 575);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(50, 0, 575);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(100, 0, 575);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, 575);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, 575);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-210, 0, 625);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-160, 0, 625);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-50, 0, 625);
+scene.add( obj );
+
+// Using wireframe materials to illustrate shape details.
+var shapes_darkMaterial = new THREE.MeshBasicMaterial( { color: 0xffccff } );
+var shapes_wireframeMaterial = new THREE.MeshBasicMaterial( { color: 0x000000, wireframe: true, transparent: true } );
+var shapes_occupiedSeatMaterial = [ shapes_darkMaterial, shapes_wireframeMaterial ];
+var obj = THREE.SceneUtils.createMultiMaterialObject( new THREE.IcosahedronGeometry(30,0), shapes_occupiedSeatMaterial );
+obj.position.set(0, 0, 625);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(50, 0, 625);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(100, 0, 625);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, 625);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, 625);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-210, 0, 675);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-160, 0, 675);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-50, 0, 675);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(0, 0, 675);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(50, 0, 675);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(100, 0, 675);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, 675);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, 675);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-210, 0, 725);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-160, 0, 725);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(-50, 0, 725);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(0, 0, 725);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(50, 0, 725);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(100, 0, 725);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(210, 0, 725);
+scene.add( obj );
+
+var obj = THREE.SceneUtils.createMultiMaterialObject( smooth, multiMaterial );
+obj.position.set(260, 0, 725);
+scene.add( obj );
+
+// floor geometry
+var floorGeometry = new THREE.PlaneGeometry(570, 1600, 10, 10);
+// aircraft profile
+var aircraft_profile_coords = new THREE.Geometry();
+aircraft_profile_coords.vertices.push( new THREE.Vector3( 12.0, -50.0, -990.0 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( 37.0, -50.0, -990.0 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( 180.0, -50.0, -865.0 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( 180.0, -50.0, -480.0 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( 930.0, -50.0, -240.0 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( 930.0, -50.0, -180.0 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( 180.0, -50.0, -264.0 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( 180.0, -50.0, 335.0 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( 130.0, -50.0, 385.0 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( 280.0, -50.0, 433.0 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( 280.0, -50.0, 445.0 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( 100.0, -50.0, 428.2 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( 40.0, -50.0, 488.2 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( 15.0, -50.0, 488.2 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( 35.0, -50.0, 488.2 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( 10.0, -50.0, 488.2 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( -50.0, -50.0, 428.2 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( -230.0, -50.0, 445.0 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( -230.0, -50.0, 433.0 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( -80.0, -50.0, 385.0 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( -130.0, -50.0, 335.0 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( -130.0, -50.0, -264.0 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( -880.0, -50.0, -180.0 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( -880.0, -50.0, -240.0 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( -130.0, -50.0, -480.0 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( -130.0, -50.0, -865.0 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( 13.0, -50.0, -990.0 ) );
+aircraft_profile_coords.vertices.push( new THREE.Vector3( 38.0, -50.0, -990.0 ) );
+
+// material
+var aircraft_material=new THREE.LineBasicMaterial({ color: 0xdddddd, linewidth: 1 });
+// line
+var aircraft_profile_line = new THREE.Line( aircraft_profile_coords, aircraft_material );
+scene.add( aircraft_profile_line );
+<!-- TEMPLATE_INSERT_AIRCRAFT_SEATS_END -->
+
+  // FLOOR
+  /*
+  var floorTexture = new THREE.ImageUtils.loadTexture( 'images/checkerboard_transparent.png' );
+  floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping; 
+  floorTexture.repeat.set( 10, 10 );
+  var floorMaterial = new THREE.MeshBasicMaterial( { map: floorTexture, side: THREE.DoubleSide } );
+  //var floor = new THREE.Mesh(floorGeometry, floorMaterial);
+  */
+  var materialP = new THREE.MeshLambertMaterial( { color: 0xdddddd } );
+  var floor = new THREE.Mesh(floorGeometry, materialP);
+  floor.position.y = -50;
+  floor.position.x = 50/2;
+  floor.position.z = -50/2;
+  floor.rotation.x = -Math.PI / 2;
+  scene.add(floor);
+
+  /* BUBBLES -------------------------------------------------------*/
+/*  
+  var bubbles_scale=1;
+  var axisMin = -5*bubbles_scale;
+  var axisMax =  5*bubbles_scale;
+  var axisRange = axisMax - axisMin;
+
+  // The Marching Cubes Algorithm draws an isosurface of a given value.
+  // To use this for a Metaballs simulation, we need to:
+  // (1) Initialize the domain - create a grid of size*size*size balls_points in space
+  // (2) Initialize the range  - a set of balls_values, corresponding to each of the balls_points, to zero.
+  // (3) Add 1 to balls_values array for balls_points on boundary of the sphere;
+  //       balls_values should decrease to zero quickly for balls_points away from sphere boundary.
+  // (4) Repeat step (3) as desired
+  // (5) Implement Marching Cubes algorithm with isovalue slightly less than 1.
+
+  var size  = 30; 
+  var size2 = size*size; 
+  var size3 = size*size*size;
+
+  var balls_points = [];
+
+  // generate the list of 3D balls_points
+  for (var k = 0; k < size; k++)
+    for (var j = 0; j < size; j++)
+      for (var i = 0; i < size; i++)
+        {
+        var x = axisMin + axisRange * i / (size - 1);
+        var y = axisMin + axisRange * j / (size - 1);
+        var z = axisMin + axisRange * k / (size - 1);
+        balls_points.push( new THREE.Vector3(x,y,z) );
+  }
+  
+  var balls_values = [];
+  // initialize balls_values
+  for (var i = 0; i < size3; i++) 
+    balls_values[i] = 0;
+
+  // resetballs_values();
+  addBall( balls_points, balls_values, new THREE.Vector3(0,3.5*bubbles_scale,0) );
+  addBall( balls_points, balls_values, new THREE.Vector3(0,0,0) );
+  addBall( balls_points, balls_values, new THREE.Vector3(-1*bubbles_scale,-1*bubbles_scale,0) );
+
+  // isolevel = 0.5;
+  var geometry = marchingCubes( balls_points, balls_values, 0.5 );
+
+  // release the bubbles!
+  var textureCube = THREE.ImageUtils.loadTextureCube( urls );
+  textureCube.format = THREE.RGBFormat;
+  var fShader = THREE.FresnelShader;
+  var fresnelUniforms = 
+  {
+    "mRefractionRatio": { type: "f", value: 1.02 },
+    "mFresnelBias":     { type: "f", value: 0.1 },
+    "mFresnelPower":    { type: "f", value: 2.0 },
+    "mFresnelScale":    { type: "f", value: 1.0 },
+    "tCube":            { type: "t", value: textureCube }
+  };  
+  // create custom material for the shader
+  var customMaterial = new THREE.ShaderMaterial( 
+  {
+    uniforms:       fresnelUniforms,
+    vertexShader:   fShader.vertexShader,
+    fragmentShader: fShader.fragmentShader
+  });
+
+  var balls_mesh = new THREE.Mesh( geometry, customMaterial );
+  scene.add(balls_mesh);
+
+  // bubbles moving around
+  this.ballUpdate = function(t)
+  {
+    resetballs_values( balls_values );
+    addBall( balls_points, balls_values, new THREE.Vector3( bubbles_scale* 2.0 * Math.cos(1.1 * t), bubbles_scale*1.5 * Math.sin(1.6 * t), bubbles_scale*3.0 * Math.sin(1.0 * t) ) );
+    addBall( balls_points, balls_values, new THREE.Vector3( bubbles_scale* 2.4 * Math.sin(1.8 * t), bubbles_scale*1.5 * Math.sin(1.3 * t), bubbles_scale*1.9 * Math.cos(1.9 * t) ) );
+    addBall( balls_points, balls_values, new THREE.Vector3( bubbles_scale* 3.0 * Math.cos(1.5 * t), bubbles_scale*2.5 * Math.cos(1.2 * t), bubbles_scale*2.1 * Math.sin(1.7 * t) ) );
+    scene.remove( balls_mesh );
+    var newGeometry = marchingCubes( balls_points, balls_values, 0.5 );
+    balls_mesh = new THREE.Mesh( newGeometry, customMaterial );
+    scene.add( balls_mesh );
+  }
+  */
+} // end init()
+
+// add balls_values corresponding to a ball with radius 1 to balls_values array
+function addBall(balls_points, balls_values, center)
+{
+  for (var i = 0; i < balls_values.length; i++)
+  {
+    var OneMinusD2 = 1.0 - center.distanceToSquared( balls_points[i] );
+    balls_values[i] += Math.exp( -(OneMinusD2 * OneMinusD2) );
+  }
+}
+function resetballs_values( balls_values )
+{
+  for (var i = 0; i < balls_values.length; i++)
+    balls_values[i] = 0;
+}
+
+// MARCHING CUBES ALGORITHM
+// parameters: domain balls_points, range balls_values, isolevel 
+// returns: geometry
+function marchingCubes( balls_points, balls_values, isolevel )
+{
+  // assumes the following global balls_values have been defined: 
+  //   THREE.edgeTable, THREE.triTable
+  
+  var size = Math.round(Math.pow(balls_values.length, 1/3));
+  var size2 = size * size;
+  var size3 = size * size * size;
+  
+  // Vertices may occur along edges of cube, when the balls_values at the edge's endballs_points
+  //   straddle the isolevel value.
+  // Actual position along edge weighted according to function balls_values.
+  var vlist = new Array(12);
+  
+  var geometry = new THREE.Geometry();
+  var vertexIndex = 0;
+  
+  for (var z = 0; z < size - 1; z++)
+  for (var y = 0; y < size - 1; y++)
+  for (var x = 0; x < size - 1; x++)
+  {
+    // index of base point, and also adjacent balls_points on cube
+    var p    = x + size * y + size2 * z,
+      px   = p   + 1,
+      py   = p   + size,
+      pxy  = py  + 1,
+      pz   = p   + size2,
+      pxz  = px  + size2,
+      pyz  = py  + size2,
+      pxyz = pxy + size2;
+    
+    // store scalar balls_values corresponding to vertices
+    var value0 = balls_values[ p    ],
+      value1 = balls_values[ px   ],
+      value2 = balls_values[ py   ],
+      value3 = balls_values[ pxy  ],
+      value4 = balls_values[ pz   ],
+      value5 = balls_values[ pxz  ],
+      value6 = balls_values[ pyz  ],
+      value7 = balls_values[ pxyz ];
+    
+    // place a "1" in bit positions corresponding to vertices whose
+    //   isovalue is less than given constant.
+    
+    var cubeindex = 0;
+    if ( value0 < isolevel ) cubeindex |= 1;
+    if ( value1 < isolevel ) cubeindex |= 2;
+    if ( value2 < isolevel ) cubeindex |= 8;
+    if ( value3 < isolevel ) cubeindex |= 4;
+    if ( value4 < isolevel ) cubeindex |= 16;
+    if ( value5 < isolevel ) cubeindex |= 32;
+    if ( value6 < isolevel ) cubeindex |= 128;
+    if ( value7 < isolevel ) cubeindex |= 64;
+    
+    // bits = 12 bit number, indicates which edges are crossed by the isosurface
+    var bits = THREE.edgeTable[ cubeindex ];
+    
+    // if none are crossed, proceed to next iteration
+    if ( bits === 0 ) continue;
+    
+    // check which edges are crossed, and estimate the point location
+    //    using a weighted average of scalar balls_values at edge endballs_points.
+    // store the vertex in an array for use later.
+    var mu = 0.5; 
+    
+    // bottom of the cube
+    if ( bits & 1 )
+    {    
+      mu = ( isolevel - value0 ) / ( value1 - value0 );
+      vlist[0] = balls_points[p].clone().lerp( balls_points[px], mu );
+    }
+    if ( bits & 2 )
+    {
+      mu = ( isolevel - value1 ) / ( value3 - value1 );
+      vlist[1] = balls_points[px].clone().lerp( balls_points[pxy], mu );
+    }
+    if ( bits & 4 )
+    {
+      mu = ( isolevel - value2 ) / ( value3 - value2 );
+      vlist[2] = balls_points[py].clone().lerp( balls_points[pxy], mu );
+    }
+    if ( bits & 8 )
+    {
+      mu = ( isolevel - value0 ) / ( value2 - value0 );
+      vlist[3] = balls_points[p].clone().lerp( balls_points[py], mu );
+    }
+    // top of the cube
+    if ( bits & 16 )
+    {
+      mu = ( isolevel - value4 ) / ( value5 - value4 );
+      vlist[4] = balls_points[pz].clone().lerp( balls_points[pxz], mu );
+    }
+    if ( bits & 32 )
+    {
+      mu = ( isolevel - value5 ) / ( value7 - value5 );
+      vlist[5] = balls_points[pxz].clone().lerp( balls_points[pxyz], mu );
+    }
+    if ( bits & 64 )
+    {
+      mu = ( isolevel - value6 ) / ( value7 - value6 );
+      vlist[6] = balls_points[pyz].clone().lerp( balls_points[pxyz], mu );
+    }
+    if ( bits & 128 )
+    {
+      mu = ( isolevel - value4 ) / ( value6 - value4 );
+      vlist[7] = balls_points[pz].clone().lerp( balls_points[pyz], mu );
+    }
+    // vertical lines of the cube
+    if ( bits & 256 )
+    {
+      mu = ( isolevel - value0 ) / ( value4 - value0 );
+      vlist[8] = balls_points[p].clone().lerp( balls_points[pz], mu );
+    }
+    if ( bits & 512 )
+    {
+      mu = ( isolevel - value1 ) / ( value5 - value1 );
+      vlist[9] = balls_points[px].clone().lerp( balls_points[pxz], mu );
+    }
+    if ( bits & 1024 )
+    {
+      mu = ( isolevel - value3 ) / ( value7 - value3 );
+      vlist[10] = balls_points[pxy].clone().lerp( balls_points[pxyz], mu );
+    }
+    if ( bits & 2048 )
+    {
+      mu = ( isolevel - value2 ) / ( value6 - value2 );
+      vlist[11] = balls_points[py].clone().lerp( balls_points[pyz], mu );
+    }
+    
+    // construct triangles -- get correct vertices from triTable.
+    var i = 0;
+    cubeindex <<= 4;  // multiply by 16... 
+    // "Re-purpose cubeindex into an offset into triTable." 
+    //  since each row really isn't a row.
+     
+    // the while loop should run at most 5 times,
+    //   since the 16th entry in each row is a -1.
+    while ( THREE.triTable[ cubeindex + i ] != -1 ) 
+    {
+      var index1 = THREE.triTable[cubeindex + i];
+      var index2 = THREE.triTable[cubeindex + i + 1];
+      var index3 = THREE.triTable[cubeindex + i + 2];
+      
+      geometry.vertices.push( vlist[index1].clone() );
+      geometry.vertices.push( vlist[index2].clone() );
+      geometry.vertices.push( vlist[index3].clone() );
+      var face = new THREE.Face3(vertexIndex, vertexIndex+1, vertexIndex+2);
+      geometry.faces.push( face );
+
+      geometry.faceVertexUvs[ 0 ].push( [ new THREE.Vector2(0,0), new THREE.Vector2(0,1), new THREE.Vector2(1,1) ] );
+
+      vertexIndex += 3;
+      i += 3;
+    }
+  }
+  
+  geometry.mergeVertices();
+  geometry.computeFaceNormals();
+  geometry.computeVertexNormals();
+   
+  return geometry;
+}
+
+/*------------------------------------------------------------------ */
+
+function animate() 
+{
+  requestAnimationFrame( animate );
+  render();
+  update();
+}
+
+function update()
+{
+  controls.update();
+  stats.update();
+  /*
+  // update balls
+  var t = clock.getElapsedTime();
+  ballUpdate(0.5 * t);
+  */
+}
+
+function render() 
+{
+  renderer.render( scene, camera );
+}
+
+</script>
+</body>
+</html>
